@@ -6,12 +6,14 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+// SchemaModels is the type that contains all the models for the schema
 type SchemaModels struct { {{ range . }}
   {{ .TableName }}Models []{{ .TableName }}Record
   {{- end }}
 }
 
-func SeedDatabase(ctx context.Context, db *sqlx.DB, models SchemaModels) error { {{ range . }}
+// seedDatabase is the function that seeds the database by adding records in order of dependency
+func seedDatabase(ctx context.Context, db *sqlx.DB, models SchemaModels) error { {{ range . }}
   for _, record := range models.{{ .TableName }}Models {
     err := Insert{{ .TableName }}TableRecord(ctx, db, record)
     if err != nil {

@@ -19,8 +19,8 @@ func Create{{ .TableName }}TableRecord(
   input {{ .TableName }}RecordInput, {{- range $key, $value := .DependencyTables }}
   {{ $key }}Model {{ $key }}Record,
   {{- end }}
-) *{{ .TableName }}Record {
-  return &{{ .TableName }}Record{ {{ range $input, $output := .InputToOutputMap }}
+) {{ .TableName }}Record {
+  return {{ .TableName }}Record{ {{ range $input, $output := .InputToOutputMap }}
     {{ $input }}: {{ $output.ObjectName }}.{{ $output.FieldName }},
     {{- end }}
   }
