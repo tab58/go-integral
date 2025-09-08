@@ -114,13 +114,14 @@ func (b *Builder) GenerateTableSchemas() ([]GolangFile, error) {
 			}
 		}
 
-		return FormatTableSchema(TableSchema{
+		tableSchema := TableSchema{
 			TableName:        table.Name,
 			TableColumns:     allColumns,
 			InputColumns:     inputColumns,
 			DependencyTables: dependencyTables,
 			InputToOutputMap: inputToOutputMap,
-		})
+		}
+		return FormatTableSchema(tableSchema)
 	})
 
 	// generate the table record files
@@ -182,11 +183,21 @@ func FormatTableSchema(tableSchema TableSchema) TableSchema {
 
 func checkGoType(column parse.Column) string {
 	nullable := false
+	isArray := false
 	for _, cons := range column.Constraints {
 		if cons.Type == parse.ConstraintInfoTypeDefault {
 			if cons.ExpressionValue == "NULL" {
 				nullable = true
 			}
+			if cons.ExpressionValue == "{}" { // this is a HACK to detect arrays because pq_query_go doesn't recognize them
+				isArray = true
+			}
+		}
+		if cons.Type == parse.ConstraintInfoTypeNotNull {
+			if nullable {
+				panic("column is nullable and has not null constraint")
+			}
+			nullable = false
 		}
 	}
 
@@ -199,10 +210,15 @@ func checkGoType(column parse.Column) string {
 		goType = "int"
 	case "boolean":
 		goType = "bool"
+	case "timestamptz":
+		goType = "time.Time"
 	}
 
 	if nullable {
 		goType = "*" + goType
+	}
+	if isArray {
+		goType = "[]" + goType
 	}
 	return goType
 }

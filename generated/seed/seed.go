@@ -7,25 +7,25 @@ import (
 )
 
 type SchemaModels struct { 
-  ResourcesModels []ResourcesRecord
   UsersModels []UsersRecord
+  ResourcesModels []ResourcesRecord
   OrganizationsModels []OrganizationsRecord
-  BusinessesModels []BusinessesRecord
   OrganizationMembersModels []OrganizationMembersRecord
+  BusinessesModels []BusinessesRecord
   BusinessOrganizationMembersModels []BusinessOrganizationMembersRecord
   BusinessAssociationsModels []BusinessAssociationsRecord
 }
 
 func SeedDatabase(ctx context.Context, db *sqlx.DB, models SchemaModels) error { 
-  for _, record := range models.ResourcesModels {
-    err := InsertResourcesTableRecord(ctx, db, record)
+  for _, record := range models.UsersModels {
+    err := InsertUsersTableRecord(ctx, db, record)
     if err != nil {
       return err
     }
   }
   
-  for _, record := range models.UsersModels {
-    err := InsertUsersTableRecord(ctx, db, record)
+  for _, record := range models.ResourcesModels {
+    err := InsertResourcesTableRecord(ctx, db, record)
     if err != nil {
       return err
     }
@@ -38,15 +38,15 @@ func SeedDatabase(ctx context.Context, db *sqlx.DB, models SchemaModels) error {
     }
   }
   
-  for _, record := range models.BusinessesModels {
-    err := InsertBusinessesTableRecord(ctx, db, record)
+  for _, record := range models.OrganizationMembersModels {
+    err := InsertOrganizationMembersTableRecord(ctx, db, record)
     if err != nil {
       return err
     }
   }
   
-  for _, record := range models.OrganizationMembersModels {
-    err := InsertOrganizationMembersTableRecord(ctx, db, record)
+  for _, record := range models.BusinessesModels {
+    err := InsertBusinessesTableRecord(ctx, db, record)
     if err != nil {
       return err
     }

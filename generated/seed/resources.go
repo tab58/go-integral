@@ -3,13 +3,14 @@ package seed
 import (
 	"context"
 
+	"time"
 	"github.com/jmoiron/sqlx"
 )
 
 type ResourcesRecordInput struct { 
   Id string
-  UploadedAt string
-  DeletedAt *string
+  UploadedAt time.Time
+  DeletedAt *time.Time
   UploaderId string
   UploadBucket string
   UploadKey string
@@ -21,8 +22,8 @@ type ResourcesRecordInput struct {
 
 type ResourcesRecord struct { 
   Id string
-  UploadedAt string
-  DeletedAt *string
+  UploadedAt time.Time
+  DeletedAt *time.Time
   UploaderId string
   UploadBucket string
   UploadKey string

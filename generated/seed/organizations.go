@@ -3,23 +3,24 @@ package seed
 import (
 	"context"
 
+	"time"
 	"github.com/jmoiron/sqlx"
 )
 
 type OrganizationsRecordInput struct { 
   Id string
-  CreatedAt string
-  UpdatedAt string
-  DeletedAt *string
+  CreatedAt time.Time
+  UpdatedAt time.Time
+  DeletedAt *time.Time
   Name string
   Description string
 }
 
 type OrganizationsRecord struct { 
   Id string
-  CreatedAt string
-  UpdatedAt string
-  DeletedAt *string
+  CreatedAt time.Time
+  UpdatedAt time.Time
+  DeletedAt *time.Time
   Name string
   Description string
   AdminMemberId string

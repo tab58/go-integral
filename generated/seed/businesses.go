@@ -3,14 +3,15 @@ package seed
 import (
 	"context"
 
+	"time"
 	"github.com/jmoiron/sqlx"
 )
 
 type BusinessesRecordInput struct { 
   Id string
-  CreatedAt string
-  UpdatedAt string
-  DeletedAt *string
+  CreatedAt time.Time
+  UpdatedAt time.Time
+  DeletedAt *time.Time
   Ein string
   BusinessName string
   BusinessAddress string
@@ -20,9 +21,9 @@ type BusinessesRecordInput struct {
 
 type BusinessesRecord struct { 
   Id string
-  CreatedAt string
-  UpdatedAt string
-  DeletedAt *string
+  CreatedAt time.Time
+  UpdatedAt time.Time
+  DeletedAt *time.Time
   Ein string
   BusinessName string
   BusinessAddress string

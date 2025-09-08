@@ -3,14 +3,15 @@ package seed
 import (
 	"context"
 
+	"time"
 	"github.com/jmoiron/sqlx"
 )
 
 type UsersRecordInput struct { 
   Id string
-  CreatedAt string
-  UpdatedAt string
-  DeletedAt *string
+  CreatedAt time.Time
+  UpdatedAt time.Time
+  DeletedAt *time.Time
   IdpId string
   Username string
   Email string
@@ -21,9 +22,9 @@ type UsersRecordInput struct {
 
 type UsersRecord struct { 
   Id string
-  CreatedAt string
-  UpdatedAt string
-  DeletedAt *string
+  CreatedAt time.Time
+  UpdatedAt time.Time
+  DeletedAt *time.Time
   IdpId string
   Username string
   Email string

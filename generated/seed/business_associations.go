@@ -3,15 +3,16 @@ package seed
 import (
 	"context"
 
+	"time"
 	"github.com/jmoiron/sqlx"
 )
 
 type BusinessAssociationsRecordInput struct { 
-  CreatedAt string
+  CreatedAt time.Time
 }
 
 type BusinessAssociationsRecord struct { 
-  CreatedAt string
+  CreatedAt time.Time
   BusinessId string
   OrgId string
 }

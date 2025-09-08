@@ -3,22 +3,23 @@ package seed
 import (
 	"context"
 
+	"time"
 	"github.com/jmoiron/sqlx"
 )
 
 type BusinessOrganizationMembersRecordInput struct { 
-  CreatedAt string
-  UpdatedAt string
-  Scopes string
+  CreatedAt time.Time
+  UpdatedAt time.Time
+  Scopes []string
 }
 
 type BusinessOrganizationMembersRecord struct { 
-  CreatedAt string
-  UpdatedAt string
+  CreatedAt time.Time
+  UpdatedAt time.Time
   UserId string
   OrgId string
   BusinessId string
-  Scopes string
+  Scopes []string
 }
 
 func CreateBusinessOrganizationMembersTableRecord(
