@@ -1,0 +1,39 @@
+package seed
+
+import (
+	"context"
+
+	"github.com/jmoiron/sqlx"
+)
+
+type {{ .TableName }}RecordInput struct { {{ range .InputColumns }}
+  {{ .Name }} {{ .GoType }}{{ end }}
+}
+
+type {{ .TableName }}Record struct { {{ range .TableColumns }}
+  {{ .Name }} {{ .GoType }}{{ end }}
+}
+
+func Create{{ .TableName }}TableRecord(
+  input {{ .TableName }}RecordInput, {{- range $key, $value := .DependencyTables }}
+  {{ $key }}Model {{ $key }}Record,
+  {{- end }}
+) *{{ .TableName }}Record {
+  return &{{ .TableName }}Record{ {{ range $input, $output := .InputToOutputMap }}
+    {{ $input }}: {{ $output.ObjectName }}.{{ $output.FieldName }},
+    {{- end }}
+  }
+}
+
+func Insert{{ .TableName }}TableRecord(ctx context.Context, db *sqlx.DB, record {{ .TableName }}Record) error {
+  query := `
+    INSERT INTO {{ .OriginalTableName }} ({{- range $i, $elem := .OriginalColumnNames }}
+      {{ $elem }}{{ if ne (inc $i) (len $.OriginalColumnNames) }}, {{- end }}{{- end }}
+    )
+    VALUES ({{ range $i, $elem := .OriginalColumnNames }}${{ inc $i }}{{ if ne (inc $i) (len $.OriginalColumnNames) }},{{- end }}{{- end }})
+  `
+  _, err := db.ExecContext(ctx, query,{{ range .TableColumns }}
+    record.{{ .Name }},{{- end }}
+  )
+  return err
+}

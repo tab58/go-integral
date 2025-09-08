@@ -1,0 +1,23 @@
+package seed
+
+import (
+	"context"
+
+	"github.com/jmoiron/sqlx"
+)
+
+type SchemaModels struct { {{ range . }}
+  {{ .TableName }}Models []{{ .TableName }}Record
+  {{- end }}
+}
+
+func SeedDatabase(ctx context.Context, db *sqlx.DB, models SchemaModels) error { {{ range . }}
+  for _, record := range models.{{ .TableName }}Models {
+    err := Insert{{ .TableName }}TableRecord(ctx, db, record)
+    if err != nil {
+      return err
+    }
+  }
+  {{ end }}
+  return nil
+}
