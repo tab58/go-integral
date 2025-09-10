@@ -5,6 +5,7 @@ import (
 	"go-integral/internal/parse"
 	"go-integral/internal/utils"
 	"slices"
+	"strings"
 
 	"github.com/iancoleman/strcase"
 	pg_query "github.com/pganalyze/pg_query_go/v6"
@@ -39,12 +40,6 @@ func NewFromSQLSchema(sqlSchema string) (*Builder, error) {
 }
 
 func (b *Builder) GenerateTableSchemas() ([]GolangFile, error) {
-	// res, err := json.Marshal(b.sortedTables)
-	// if err != nil {
-	// 	return nil, errors.New("failed to marshal sorted tables: " + err.Error())
-	// }
-	// fmt.Printf("%+v\n", string(res))
-
 	tableSchemas := utils.Map(b.sortedTables, func(table parse.Table) TableSchema {
 		// get the constraint columns
 		constraintColumnNames := utils.Reduce(table.Constraints, func(result []string, constraint parse.TableConstraint) []string {
@@ -68,9 +63,10 @@ func (b *Builder) GenerateTableSchemas() ([]GolangFile, error) {
 		}, make(map[string][]string))
 
 		allColumns := utils.Map(table.Columns, func(column parse.Column) TableSchemaColumn {
+			goType := checkGoType(column)
 			return TableSchemaColumn{
 				Name:   column.Name,
-				GoType: checkGoType(column),
+				GoType: goType,
 			}
 		})
 
@@ -80,9 +76,10 @@ func (b *Builder) GenerateTableSchemas() ([]GolangFile, error) {
 			}
 
 			// create the input type
+			goType := checkGoType(column)
 			return append(result, TableSchemaColumn{
 				Name:   column.Name,
-				GoType: checkGoType(column),
+				GoType: goType,
 			})
 		}, []TableSchemaColumn{})
 
@@ -183,14 +180,10 @@ func FormatTableSchema(tableSchema TableSchema) TableSchema {
 
 func checkGoType(column parse.Column) string {
 	nullable := false
-	isArray := false
 	for _, cons := range column.Constraints {
 		if cons.Type == parse.ConstraintInfoTypeDefault {
 			if cons.ExpressionValue == "NULL" {
 				nullable = true
-			}
-			if cons.ExpressionValue == "{}" { // this is a HACK to detect arrays because pq_query_go doesn't recognize them
-				isArray = true
 			}
 		}
 		if cons.Type == parse.ConstraintInfoTypeNotNull {
@@ -201,24 +194,59 @@ func checkGoType(column parse.Column) string {
 		}
 	}
 
-	goType := "string" // default to string
-
-	switch column.DataType {
+	goType := "any"
+	switch strings.ToLower(column.DataType) {
 	case "text":
 		goType = "string"
-	case "integer":
-		goType = "int"
+	case "text[]":
+		goType = "[]string"
+	case "varchar":
+		goType = "string"
+
 	case "boolean":
 		goType = "bool"
+
+	case "date":
+		goType = "time.Time"
 	case "timestamptz":
 		goType = "time.Time"
+
+	case "smallint":
+		goType = "int16"
+	case "int2":
+		goType = "int16"
+	case "int4":
+		goType = "int32"
+	case "integer":
+		goType = "int32"
+	case "serial":
+		goType = "int32"
+	case "bigserial":
+		goType = "int64"
+	case "int8":
+		goType = "int64"
+	case "bigint":
+		goType = "int64"
+	case "real":
+		goType = "float32"
+	case "float4":
+		goType = "float32"
+	case "decimal":
+		goType = "float64"
+	case "numeric":
+		goType = "float64"
+	case "double precision":
+		goType = "float64"
+
+	case "json":
+		goType = "map[string]any"
+
+	default:
+		goType = "any"
 	}
 
-	if nullable {
+	if nullable && !strings.HasPrefix(goType, "[]") {
 		goType = "*" + goType
-	}
-	if isArray {
-		goType = "[]" + goType
 	}
 	return goType
 }

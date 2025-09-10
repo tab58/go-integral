@@ -32,8 +32,9 @@ func (m *EntityManager) parseNode(node *pg_query.Node) error {
 	case *pg_query.Node_CreateStmt:
 		return m.parseCreateTable(n)
 	case *pg_query.Node_IndexStmt:
-		return m.parseIndex(n)
+		fmt.Printf("skipping index stmt...\n")
 	default:
 		return fmt.Errorf("unknown node type: %+v", n)
 	}
+	return nil
 }

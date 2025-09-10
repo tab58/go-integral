@@ -6,10 +6,6 @@ import (
 	pg_query "github.com/pganalyze/pg_query_go/v6"
 )
 
-func (m *EntityManager) parseIndex(node *pg_query.Node_IndexStmt) error {
-	return nil
-}
-
 func (m *EntityManager) parseCreateTable(node *pg_query.Node_CreateStmt) error {
 	stmt := node.CreateStmt
 
@@ -123,6 +119,8 @@ func getColumnType(colDef *pg_query.Node_ColumnDef) string {
 
 	for _, cons := range consts {
 		if cons.Type == ConstraintInfoTypeDefault {
+			// TODO: this is a HACK to detect arrays because pq_query_go doesn't recognize them
+			// This should be removed once pq_query_go recognizes arrays
 			if cons.ExpressionValue == "{}" {
 				colTypeString = colTypeString + "[]"
 			}

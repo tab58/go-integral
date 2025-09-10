@@ -109,7 +109,7 @@ CREATE TABLE "resources" (
 
   "resource_filename" text DEFAULT NULL,
   "resource_size" bigint DEFAULT NULL,
-  "tags" text DEFAULT NULL
+  "tags" text[] DEFAULT NULL
 );
 
 CREATE INDEX "idx_resources_upload_bucket_and_key" ON "resources" ("upload_bucket", "upload_key");
