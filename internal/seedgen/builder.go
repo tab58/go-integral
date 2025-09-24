@@ -2,10 +2,10 @@ package seedgen
 
 import (
 	"errors"
+	"fmt"
 	"go-integral/internal/parse"
 	"go-integral/internal/parse/nodes"
 	"go-integral/internal/utils"
-	"slices"
 	"strings"
 
 	"github.com/iancoleman/strcase"
@@ -33,115 +33,51 @@ func NewFromSQLSchema(sqlSchema string) (*Builder, error) {
 	}, nil
 }
 
-func (b *Builder) GenerateTableSchemas() ([]GolangFile, error) {
-	tableSchemas := utils.Map(b.sortedTables, func(table nodes.Table) TableSchema {
-		// get the constraint columns
-		constraintColumnNames := utils.Reduce(table.Constraints, func(result []string, constraint nodes.TableConstraint) []string {
-			if constraint.Type == nodes.ConstraintInfoTypeForeignKey {
-				info := constraint.Constraint.(*nodes.ForeignKeyConstraintInfo)
-				return append(result, info.TableColumnName)
-			}
-			return result
-		}, []string{})
-
-		// get the dependent tables and columns
-		dependencyTables := utils.Reduce(table.Constraints, func(result map[string][]string, constraint nodes.TableConstraint) map[string][]string {
-			if constraint.Type == nodes.ConstraintInfoTypeForeignKey {
-				info := constraint.Constraint.(*nodes.ForeignKeyConstraintInfo)
-				dependencyName := info.ForeignKeyTableName
-				colName := info.TableColumnName
-				result[dependencyName] = append(result[dependencyName], colName)
-				return result
-			}
-			return result
-		}, make(map[string][]string))
-
-		allColumns := utils.Map(table.Columns, func(column nodes.Column) TableSchemaColumn {
-			goType := checkGoType(column)
-			return TableSchemaColumn{
-				Name:   column.Name,
-				GoType: goType,
-			}
-		})
-
-		inputColumns := utils.Reduce(table.Columns, func(result []TableSchemaColumn, column nodes.Column) []TableSchemaColumn {
-			if slices.Contains(constraintColumnNames, column.Name) {
-				return result
-			}
-
-			// create the input type
-			goType := checkGoType(column)
-			return append(result, TableSchemaColumn{
-				Name:   column.Name,
-				GoType: goType,
-			})
-		}, []TableSchemaColumn{})
-
-		inputToOutputMap := make(map[string]OutputMapData)
-		for _, column := range allColumns {
-			recordColName := strcase.ToCamel(column.Name)
-
-			added := false
-			for _, x := range table.Constraints {
-				if x.Type == nodes.ConstraintInfoTypeForeignKey {
-					info := x.Constraint.(*nodes.ForeignKeyConstraintInfo)
-					if info.TableColumnName == column.Name {
-						fkTableName := info.ForeignKeyTableName
-						fkColumnName := info.ForeignKeyColumnName
-						inputToOutputMap[recordColName] = OutputMapData{
-							ObjectName: strcase.ToCamel(fkTableName) + "Model",
-							FieldName:  strcase.ToCamel(fkColumnName),
-						}
-						added = true
-					}
-				}
-			}
-
-			if !added {
-				inputToOutputMap[recordColName] = OutputMapData{
-					ObjectName: "input",
-					FieldName:  recordColName,
-				}
-			}
-		}
-
-		tableSchema := TableSchema{
-			TableName:        table.Name,
-			TableColumns:     allColumns,
-			InputColumns:     inputColumns,
-			DependencyTables: dependencyTables,
-			InputToOutputMap: inputToOutputMap,
-		}
-		return FormatTableSchema(tableSchema)
-	})
+func (b *Builder) GenerateTemplateFiles() ([]GolangFile, error) {
+	// generate the table schemas
+	tableSchemas, err := utils.MapErr(b.sortedTables, generateTableSchema)
+	if err != nil {
+		return nil, fmt.Errorf("unable to generate table schemas: %w", err)
+	}
 
 	// generate the table record files
-	files := make([]GolangFile, 0)
-	for _, tableSchema := range tableSchemas {
-		fileContents, err := GenerateGoFileFromTableSchema(tableSchema)
-		if err != nil {
-			return nil, err
-		}
-		files = append(files, GolangFile{
-			Filename: strcase.ToSnake(tableSchema.TableName) + ".go",
-			Contents: fileContents,
-		})
+	files, err := utils.MapErr(tableSchemas, generateGoFileFromTableSchema)
+	if err != nil {
+		return nil, fmt.Errorf("unable to generate Golang file from table schema: %w", err)
 	}
 
 	// generate the seed script
-	seedScriptContents, err := GenerateSeedScriptFromTableSchemas(tableSchemas)
+	seedScript, err := generateSeedScriptFromTableSchemas(tableSchemas)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to generate seed script from table schemas: %w", err)
 	}
-	files = append(files, GolangFile{
-		Filename: "seed.go",
-		Contents: seedScriptContents,
-	})
 
-	return files, nil
+	return append(files, seedScript), nil
 }
 
-func checkGoType(column nodes.Column) string {
+func generateSeedScriptFromTableSchemas(schemas []TableSchema) (GolangFile, error) {
+	contents, err := generateSeedScriptContentsFromTableSchemas(schemas)
+	if err != nil {
+		return GolangFile{}, fmt.Errorf("unable to generate seed script contents from table schemas: %w", err)
+	}
+	return GolangFile{
+		Filename: "seed.go",
+		Contents: contents,
+	}, nil
+}
+
+func generateGoFileFromTableSchema(schema TableSchema) (GolangFile, error) {
+	contents, err := generateFileContentsFromTableSchema(schema)
+	if err != nil {
+		return GolangFile{}, fmt.Errorf("unable to generate file contents from table schema: %w", err)
+	}
+	return GolangFile{
+		Filename: strcase.ToSnake(schema.TableName) + ".go",
+		Contents: contents,
+	}, nil
+}
+
+func checkGolangDataType(column nodes.Column) string {
 	nullable := false
 	for _, cons := range column.Constraints {
 		if cons.Type == nodes.ConstraintInfoTypeDefault {

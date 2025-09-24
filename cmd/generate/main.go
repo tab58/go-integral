@@ -19,7 +19,7 @@ func main() {
 		log.Fatalf("failed to create builder: %v", err)
 	}
 
-	files, err := builder.GenerateTableSchemas()
+	files, err := builder.GenerateTemplateFiles()
 	if err != nil {
 		log.Fatalf("failed to generate table schemas: %v", err)
 	}

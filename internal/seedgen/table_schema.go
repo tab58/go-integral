@@ -9,7 +9,7 @@ import (
 	"github.com/iancoleman/strcase"
 )
 
-func GenerateTableSchema(table nodes.Table) (TableSchema, error) {
+func generateTableSchema(table nodes.Table) (TableSchema, error) {
 	// get the constraint columns
 	constraintColumnNames, err := generateConstraintColumnNames(table.Constraints)
 	if err != nil {
@@ -27,7 +27,7 @@ func GenerateTableSchema(table nodes.Table) (TableSchema, error) {
 
 	// filter on the constraints to get the input columns
 	inputColumns := utils.Filter(allColumns, func(column TableSchemaColumn) bool {
-		return slices.Contains(constraintColumnNames, column.Name)
+		return !slices.Contains(constraintColumnNames, column.Name)
 	})
 
 	// map the Golang input names to the SQL output names
@@ -81,7 +81,7 @@ func createInputOutputMap(columns []TableSchemaColumn, tableConstraints []nodes.
 }
 
 func convertToSchemaColumn(column nodes.Column) TableSchemaColumn {
-	goType := checkGoType(column)
+	goType := checkGolangDataType(column)
 	return TableSchemaColumn{
 		Name:   column.Name,
 		GoType: goType,

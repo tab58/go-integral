@@ -9,7 +9,7 @@ import (
 //go:embed templates/seed_script.tmpl
 var seedScriptTemplate string
 
-func GenerateSeedScriptFromTableSchemas(schemas []TableSchema) (string, error) {
+func generateSeedScriptContentsFromTableSchemas(schemas []TableSchema) (string, error) {
 	funcMap := template.FuncMap{
 		"inc": func(i int) int {
 			return i + 1
@@ -32,7 +32,7 @@ func GenerateSeedScriptFromTableSchemas(schemas []TableSchema) (string, error) {
 //go:embed templates/table_record.tmpl
 var tableRecordTemplate string
 
-func GenerateGoFileFromTableSchema(schema TableSchema) (string, error) {
+func generateFileContentsFromTableSchema(schema TableSchema) (string, error) {
 	funcMap := template.FuncMap{
 		// The name "inc" is what the function will be called in the template text.
 		"inc": func(i int) int {
