@@ -3,32 +3,26 @@ package seedgen
 import (
 	"errors"
 	"go-integral/internal/parse"
+	"go-integral/internal/parse/nodes"
 	"go-integral/internal/utils"
 	"slices"
 	"strings"
 
 	"github.com/iancoleman/strcase"
-	pg_query "github.com/pganalyze/pg_query_go/v6"
 )
 
 type Builder struct {
-	sortedTables []parse.Table
+	sortedTables []nodes.Table
 }
 
 func NewFromSQLSchema(sqlSchema string) (*Builder, error) {
-	pgQuery, err := pg_query.Parse(sqlSchema)
-	if err != nil {
-		return nil, errors.New("failed to parse PostgreSQL schema source: " + err.Error())
-	}
-
-	mgr := parse.NewEntityManager()
-	err = mgr.ParseSQLSchema(pgQuery)
-	if err != nil {
-		return nil, errors.New("failed to parse SQL data: " + err.Error())
-	}
-
 	// build dependency graph
-	graph := parse.BuildDependencyGraph(mgr)
+	graph, err := parse.BuildSQLTableGraph(sqlSchema)
+	if err != nil {
+		return nil, errors.New("failed to build table graph: " + err.Error())
+	}
+
+	// get tables in record insert order
 	result, err := graph.TopologicalSort()
 	if err != nil {
 		return nil, errors.New("failed to get table relationships: " + err.Error())
@@ -40,20 +34,20 @@ func NewFromSQLSchema(sqlSchema string) (*Builder, error) {
 }
 
 func (b *Builder) GenerateTableSchemas() ([]GolangFile, error) {
-	tableSchemas := utils.Map(b.sortedTables, func(table parse.Table) TableSchema {
+	tableSchemas := utils.Map(b.sortedTables, func(table nodes.Table) TableSchema {
 		// get the constraint columns
-		constraintColumnNames := utils.Reduce(table.Constraints, func(result []string, constraint parse.TableConstraint) []string {
-			if constraint.Type == parse.ConstraintInfoTypeForeignKey {
-				info := constraint.Constraint.(*parse.ForeignKeyConstraintInfo)
+		constraintColumnNames := utils.Reduce(table.Constraints, func(result []string, constraint nodes.TableConstraint) []string {
+			if constraint.Type == nodes.ConstraintInfoTypeForeignKey {
+				info := constraint.Constraint.(*nodes.ForeignKeyConstraintInfo)
 				return append(result, info.TableColumnName)
 			}
 			return result
 		}, []string{})
 
 		// get the dependent tables and columns
-		dependencyTables := utils.Reduce(table.Constraints, func(result map[string][]string, constraint parse.TableConstraint) map[string][]string {
-			if constraint.Type == parse.ConstraintInfoTypeForeignKey {
-				info := constraint.Constraint.(*parse.ForeignKeyConstraintInfo)
+		dependencyTables := utils.Reduce(table.Constraints, func(result map[string][]string, constraint nodes.TableConstraint) map[string][]string {
+			if constraint.Type == nodes.ConstraintInfoTypeForeignKey {
+				info := constraint.Constraint.(*nodes.ForeignKeyConstraintInfo)
 				dependencyName := info.ForeignKeyTableName
 				colName := info.TableColumnName
 				result[dependencyName] = append(result[dependencyName], colName)
@@ -62,7 +56,7 @@ func (b *Builder) GenerateTableSchemas() ([]GolangFile, error) {
 			return result
 		}, make(map[string][]string))
 
-		allColumns := utils.Map(table.Columns, func(column parse.Column) TableSchemaColumn {
+		allColumns := utils.Map(table.Columns, func(column nodes.Column) TableSchemaColumn {
 			goType := checkGoType(column)
 			return TableSchemaColumn{
 				Name:   column.Name,
@@ -70,7 +64,7 @@ func (b *Builder) GenerateTableSchemas() ([]GolangFile, error) {
 			}
 		})
 
-		inputColumns := utils.Reduce(table.Columns, func(result []TableSchemaColumn, column parse.Column) []TableSchemaColumn {
+		inputColumns := utils.Reduce(table.Columns, func(result []TableSchemaColumn, column nodes.Column) []TableSchemaColumn {
 			if slices.Contains(constraintColumnNames, column.Name) {
 				return result
 			}
@@ -89,8 +83,8 @@ func (b *Builder) GenerateTableSchemas() ([]GolangFile, error) {
 
 			added := false
 			for _, x := range table.Constraints {
-				if x.Type == parse.ConstraintInfoTypeForeignKey {
-					info := x.Constraint.(*parse.ForeignKeyConstraintInfo)
+				if x.Type == nodes.ConstraintInfoTypeForeignKey {
+					info := x.Constraint.(*nodes.ForeignKeyConstraintInfo)
 					if info.TableColumnName == column.Name {
 						fkTableName := info.ForeignKeyTableName
 						fkColumnName := info.ForeignKeyColumnName
@@ -147,46 +141,15 @@ func (b *Builder) GenerateTableSchemas() ([]GolangFile, error) {
 	return files, nil
 }
 
-func FormatTableSchema(tableSchema TableSchema) TableSchema {
-	newDependencyTables := make(map[string][]string)
-	for key, value := range tableSchema.DependencyTables {
-		newDependencyTables[strcase.ToCamel(key)] = utils.Map(value, func(column string) string {
-			return strcase.ToCamel(column)
-		})
-	}
-
-	return TableSchema{
-		OriginalTableName: tableSchema.TableName,
-		TableName:         strcase.ToCamel(tableSchema.TableName),
-		OriginalColumnNames: utils.Map(tableSchema.TableColumns, func(column TableSchemaColumn) string {
-			return column.Name
-		}),
-		TableColumns: utils.Map(tableSchema.TableColumns, func(column TableSchemaColumn) TableSchemaColumn {
-			return TableSchemaColumn{
-				Name:   strcase.ToCamel(column.Name),
-				GoType: column.GoType,
-			}
-		}),
-		InputColumns: utils.Map(tableSchema.InputColumns, func(column TableSchemaColumn) TableSchemaColumn {
-			return TableSchemaColumn{
-				Name:   strcase.ToCamel(column.Name),
-				GoType: column.GoType,
-			}
-		}),
-		DependencyTables: newDependencyTables,
-		InputToOutputMap: tableSchema.InputToOutputMap,
-	}
-}
-
-func checkGoType(column parse.Column) string {
+func checkGoType(column nodes.Column) string {
 	nullable := false
 	for _, cons := range column.Constraints {
-		if cons.Type == parse.ConstraintInfoTypeDefault {
+		if cons.Type == nodes.ConstraintInfoTypeDefault {
 			if cons.ExpressionValue == "NULL" {
 				nullable = true
 			}
 		}
-		if cons.Type == parse.ConstraintInfoTypeNotNull {
+		if cons.Type == nodes.ConstraintInfoTypeNotNull {
 			if nullable {
 				panic("column is nullable and has not null constraint")
 			}
