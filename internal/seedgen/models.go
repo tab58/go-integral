@@ -1,18 +1,42 @@
 package seedgen
 
+type RawTableSchema struct {
+	TableName        string
+	TablePrimaryKey  []string
+	TableColumns     []RawTableSchemaColumn
+	InputColumns     []RawTableSchemaColumn
+	DependencyTables map[string][]string
+	InputToOutputMap map[string]OutputMapData
+}
+type RawTableSchemaColumn struct {
+	Name   string
+	GoType string
+}
+
 type TableSchema struct {
-	OriginalTableName   string
-	OriginalColumnNames []string
-	TableName           string
-	TableColumns        []TableSchemaColumn
-	InputColumns        []TableSchemaColumn
-	DependencyTables    map[string][]string
-	InputToOutputMap    map[string]OutputMapData
+	TableName          SQLGolangStringValue
+	SQLTablePrimaryKey []SQLGolangStringValue
+	TableColumns       []TableSchemaColumn
+	SQLColumnNames     []SQLGolangStringValue
+	RecordInputColumns []TableSchemaColumn
+	DependencyTables   []DependencyTable
+	InputToOutputMap   map[string]OutputMapData
 }
 
 type TableSchemaColumn struct {
-	Name   string
+	Name   SQLGolangStringValue
 	GoType string
+}
+
+type SQLGolangStringValue struct {
+	SQL    string
+	Golang string
+}
+
+type DependencyTable struct {
+	GolangTableName string
+	InputRecordName string
+	ColumnNames     []string
 }
 
 type OutputMapData struct {

@@ -72,7 +72,7 @@ func generateGoFileFromTableSchema(schema TableSchema) (GolangFile, error) {
 		return GolangFile{}, fmt.Errorf("unable to generate file contents from table schema: %w", err)
 	}
 	return GolangFile{
-		Filename: strcase.ToSnake(schema.TableName) + ".go",
+		Filename: strcase.ToSnake(schema.TableName.Golang) + ".go",
 		Contents: contents,
 	}, nil
 }

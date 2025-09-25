@@ -26,7 +26,7 @@ func generateTableSchema(table nodes.Table) (TableSchema, error) {
 	allColumns := utils.Map(table.Columns, convertToSchemaColumn)
 
 	// filter on the constraints to get the input columns
-	inputColumns := utils.Filter(allColumns, func(column TableSchemaColumn) bool {
+	inputColumns := utils.Filter(allColumns, func(column RawTableSchemaColumn) bool {
 		return !slices.Contains(constraintColumnNames, column.Name)
 	})
 
@@ -36,17 +36,70 @@ func generateTableSchema(table nodes.Table) (TableSchema, error) {
 		return TableSchema{}, fmt.Errorf("unable to get input-output map: %w", err)
 	}
 
-	tableSchema := TableSchema{
+	tableSchema := RawTableSchema{
 		TableName:        table.Name,
+		TablePrimaryKey:  table.PrimaryKey,
 		TableColumns:     allColumns,
 		InputColumns:     inputColumns,
 		DependencyTables: dependencyTables,
 		InputToOutputMap: inputToOutputMap,
 	}
-	return FormatTableSchema(tableSchema), nil
+	return refineTableSchema(tableSchema), nil
 }
 
-func createInputOutputMap(columns []TableSchemaColumn, tableConstraints []nodes.TableConstraint) (map[string]OutputMapData, error) {
+// refineTableSchema "massages" the format of the table schema to make it more Golang-friendly
+func refineTableSchema(tableSchema RawTableSchema) TableSchema {
+	refinedTableSchema := TableSchema{
+		TableName: SQLGolangStringValue{
+			SQL:    tableSchema.TableName,
+			Golang: strcase.ToCamel(tableSchema.TableName),
+		},
+		SQLTablePrimaryKey: utils.Map(tableSchema.TablePrimaryKey, func(column string) SQLGolangStringValue {
+			return SQLGolangStringValue{
+				SQL:    column,
+				Golang: strcase.ToCamel(column),
+			}
+		}),
+		TableColumns: utils.Map(tableSchema.TableColumns, func(column RawTableSchemaColumn) TableSchemaColumn {
+			return TableSchemaColumn{
+				Name: SQLGolangStringValue{
+					SQL:    column.Name,
+					Golang: strcase.ToCamel(column.Name),
+				},
+				GoType: column.GoType,
+			}
+		}),
+		RecordInputColumns: utils.Map(tableSchema.InputColumns, func(column RawTableSchemaColumn) TableSchemaColumn {
+			return TableSchemaColumn{
+				Name: SQLGolangStringValue{
+					SQL:    column.Name,
+					Golang: strcase.ToCamel(column.Name),
+				},
+				GoType: column.GoType,
+			}
+		}),
+		DependencyTables: refineDependencyTables(tableSchema.DependencyTables),
+		InputToOutputMap: tableSchema.InputToOutputMap,
+	}
+	return refinedTableSchema
+}
+
+func refineDependencyTables(dependencyTables map[string][]string) []DependencyTable {
+	newDependencyTables := make([]DependencyTable, 0)
+	for key, value := range dependencyTables {
+		depTableKey := strcase.ToCamel(key)
+		newDependencyTables = append(newDependencyTables, DependencyTable{
+			GolangTableName: depTableKey,
+			InputRecordName: strcase.ToLowerCamel(key),
+			ColumnNames: utils.Map(value, func(column string) string {
+				return strcase.ToCamel(column)
+			}),
+		})
+	}
+	return newDependencyTables
+}
+
+func createInputOutputMap(columns []RawTableSchemaColumn, tableConstraints []nodes.TableConstraint) (map[string]OutputMapData, error) {
 	inputToOutputMap := make(map[string]OutputMapData)
 	for _, column := range columns {
 		recordColName := strcase.ToCamel(column.Name)
@@ -62,7 +115,7 @@ func createInputOutputMap(columns []TableSchemaColumn, tableConstraints []nodes.
 					fkTableName := info.ForeignKeyTableName
 					fkColumnName := info.ForeignKeyColumnName
 					inputToOutputMap[recordColName] = OutputMapData{
-						ObjectName: strcase.ToCamel(fkTableName) + "Model",
+						ObjectName: strcase.ToLowerCamel(fkTableName) + "Model",
 						FieldName:  strcase.ToCamel(fkColumnName),
 					}
 					added = true
@@ -80,9 +133,9 @@ func createInputOutputMap(columns []TableSchemaColumn, tableConstraints []nodes.
 	return inputToOutputMap, nil
 }
 
-func convertToSchemaColumn(column nodes.Column) TableSchemaColumn {
+func convertToSchemaColumn(column nodes.Column) RawTableSchemaColumn {
 	goType := checkGolangDataType(column)
-	return TableSchemaColumn{
+	return RawTableSchemaColumn{
 		Name:   column.Name,
 		GoType: goType,
 	}
@@ -115,35 +168,4 @@ func generateConstraintColumnNames(constraints []nodes.TableConstraint) ([]strin
 		}
 		return result, nil
 	}, []string{})
-}
-
-func FormatTableSchema(tableSchema TableSchema) TableSchema {
-	newDependencyTables := make(map[string][]string)
-	for key, value := range tableSchema.DependencyTables {
-		newDependencyTables[strcase.ToCamel(key)] = utils.Map(value, func(column string) string {
-			return strcase.ToCamel(column)
-		})
-	}
-
-	return TableSchema{
-		OriginalTableName: tableSchema.TableName,
-		TableName:         strcase.ToCamel(tableSchema.TableName),
-		OriginalColumnNames: utils.Map(tableSchema.TableColumns, func(column TableSchemaColumn) string {
-			return column.Name
-		}),
-		TableColumns: utils.Map(tableSchema.TableColumns, func(column TableSchemaColumn) TableSchemaColumn {
-			return TableSchemaColumn{
-				Name:   strcase.ToCamel(column.Name),
-				GoType: column.GoType,
-			}
-		}),
-		InputColumns: utils.Map(tableSchema.InputColumns, func(column TableSchemaColumn) TableSchemaColumn {
-			return TableSchemaColumn{
-				Name:   strcase.ToCamel(column.Name),
-				GoType: column.GoType,
-			}
-		}),
-		DependencyTables: newDependencyTables,
-		InputToOutputMap: tableSchema.InputToOutputMap,
-	}
 }

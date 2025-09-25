@@ -9,34 +9,57 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-type {{ .TableName }}RecordInput struct { {{ range .InputColumns }}
-  {{ .Name }} {{ .GoType }}{{ end }}
+type {{ .TableName.Golang }}RecordInput struct { {{ range .RecordInputColumns }}
+  {{ .Name.Golang }} {{ .GoType }}{{ end }}
 }
 
-type {{ .TableName }}Record struct { {{ range .TableColumns }}
-  {{ .Name }} {{ .GoType }}{{ end }}
+type {{ .TableName.Golang }}Record struct { {{ range .TableColumns }}
+  {{ .Name.Golang }} {{ .GoType }} `db:"{{ .Name.SQL }}"`{{ end }}
 }
 
-func Create{{ .TableName }}TableRecord(
-  input {{ .TableName }}RecordInput, {{- range $key, $value := .DependencyTables }}
-  {{ $key }}Model {{ $key }}Record,
+// Create{{ .TableName.Golang }}TableRecord is a function that creates a record from an input
+func Create{{ .TableName.Golang }}TableRecord(
+  input {{ .TableName.Golang }}RecordInput, {{- range $i, $value := .DependencyTables }}
+  {{ $value.InputRecordName }}Model {{ $value.GolangTableName }}Record,
   {{- end }}
-) {{ .TableName }}Record {
-  return {{ .TableName }}Record{ {{ range $input, $output := .InputToOutputMap }}
+) {{ .TableName.Golang }}Record {
+  return {{ .TableName.Golang }}Record{ {{ range $input, $output := .InputToOutputMap }}
     {{ $input }}: {{ $output.ObjectName }}.{{ $output.FieldName }},
     {{- end }}
   }
 }
 
-func Insert{{ .TableName }}TableRecord(ctx context.Context, db *sqlx.DB, record {{ .TableName }}Record) error {
+// Insert{{ .TableName.Golang }}TableRecord is a function that inserts a record into the database
+func Insert{{ .TableName.Golang }}TableRecord(ctx context.Context, db *sqlx.DB, record {{ .TableName.Golang }}Record) error {
   query := `
-    INSERT INTO {{ .OriginalTableName }} ({{- range $i, $elem := .OriginalColumnNames }}
-      {{ $elem }}{{ if ne (inc $i) (len $.OriginalColumnNames) }}, {{- end }}{{- end }}
+    INSERT INTO {{ .TableName.SQL }} ({{- range $i, $elem := .TableColumns }}
+      {{ $elem.Name.SQL }}{{ if ne (inc $i) (len $.TableColumns) }}, {{- end }}{{- end }}
     )
-    VALUES ({{ range $i, $elem := .OriginalColumnNames }}${{ inc $i }}{{ if ne (inc $i) (len $.OriginalColumnNames) }},{{- end }}{{- end }})
+    VALUES ({{ range $i, $elem := .TableColumns }}${{ inc $i }}{{ if ne (inc $i) (len $.TableColumns) }},{{- end }}{{- end }})
   `
   _, err := db.ExecContext(ctx, query,{{ range .TableColumns }}
-    record.{{ .Name }},{{- end }}
+    record.{{ .Name.Golang }},{{- end }}
   )
   return err
+}
+
+// Assert{{ .TableName.Golang }}TableRecord is a function that asserts that a particular record exists in the database
+func Assert{{ .TableName.Golang }}TableRecord(ctx context.Context, db *sqlx.DB, record {{ .TableName.Golang }}Record) error {
+  query := `
+    SELECT * FROM {{ .TableName.SQL }}
+    WHERE {{ range $i, $elem := .SQLTablePrimaryKey }}{{ if ne ($i) (0) }} AND {{ end }}{{ $elem.SQL }} = ${{ inc $i }}{{- end }}
+    LIMIT 1;
+  `
+  
+  var dbRecord {{ .TableName.Golang }}Record
+  err := db.GetContext(ctx, &dbRecord, query,{{ range $i, $elem := .SQLTablePrimaryKey }}
+    record.{{ $elem.Golang }},{{- end }}
+  )
+  if err != nil {
+    return err
+  }
+  
+  // TODO: compare the records (reflect.DeepEqual?), but optionally omit checking the DateTime fields
+  
+  return nil
 }

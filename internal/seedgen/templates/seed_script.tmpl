@@ -10,14 +10,14 @@ import (
 
 // SchemaModels is the type that contains all the models for the schema
 type SchemaModels struct { {{ range . }}
-  {{ .TableName }}Models []{{ .TableName }}Record
+  {{ .TableName.Golang }}Models []{{ .TableName.Golang }}Record
   {{- end }}
 }
 
 // seedDatabase is the function that seeds the database by adding records in order of dependency
 func seedDatabase(ctx context.Context, db *sqlx.DB, models SchemaModels) error { {{ range . }}
-  for _, record := range models.{{ .TableName }}Models {
-    err := Insert{{ .TableName }}TableRecord(ctx, db, record)
+  for _, record := range models.{{ .TableName.Golang }}Models {
+    err := Insert{{ .TableName.Golang }}TableRecord(ctx, db, record)
     if err != nil {
       return err
     }
