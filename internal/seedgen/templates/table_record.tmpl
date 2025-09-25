@@ -5,7 +5,11 @@ package seed
 import (
 	"context"
 
+	"fmt"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -59,7 +63,12 @@ func Assert{{ .TableName.Golang }}TableRecord(ctx context.Context, db *sqlx.DB, 
     return err
   }
   
-  // TODO: compare the records (reflect.DeepEqual?), but optionally omit checking the DateTime fields
-  
-  return nil
+  // compare the records, but optionally omit checking the DateTime fields
+  isEqual := cmp.Equal(dbRecord, record, cmpopts.IgnoreTypes(time.Time{}))
+  if !isEqual {
+    return fmt.Errorf("record does not match the database record")
+  } else {
+    return nil
+  }
 }
+
